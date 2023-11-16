@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/checkout@v3
         with:
-          repository: 'XTLS/Xray-core'
+          repository: 'romaxa55/xray'
           path: 'xray'
 
       - name: Setup Go
@@ -34,7 +34,7 @@ jobs:
         run: |
           cd xray
           make
-          zip -ry XrayKit.xcframework.zip ./XrayKit.xcframework
+          zip -ry XrayKit.xcframework.zip ./xray.xcframework
 
       - name: Render Template
         run: |
