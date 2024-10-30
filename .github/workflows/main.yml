@@ -14,7 +14,6 @@ jobs:
     strategy:
       matrix:
         os: [macOS-12, ubuntu-latest, windows-latest]
-        # Add other variables if needed, e.g., architecture
     steps:
 
       - uses: actions/checkout@v3
@@ -32,7 +31,8 @@ jobs:
         with:
           go-version: '1.23'
 
-      - name: Setup Gomobile (macOS only)
+      # Setup Gomobile only on macOS
+      - name: Setup Gomobile
         if: runner.os == 'macOS'
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
@@ -43,35 +43,48 @@ jobs:
           if [ "${{ runner.os }}" == "macOS" ]; then
             cd xray
             make
-            zip -ry XrayKit.xcframework.zip ./xray.xcframework
+            # Verify build output
+            if [ -d "./xray.xcframework" ]; then
+              zip -ry ../XrayKit.xcframework.zip ./xray.xcframework
+            else
+              echo "xray.xcframework not found!"
+              exit 1
+            fi
           elif [ "${{ runner.os }}" == "Linux" ]; then
-            # Add Linux build commands here
             echo "Building for Linux..."
-            # Example:
-            # make linux
+            # Replace the following line with your actual Linux build commands
+            make linux
+            # Example: tar -czvf XrayKit-linux.tar.gz ./build/linux/
           elif [ "${{ runner.os }}" == "Windows" ]; then
-            # Add Windows build commands here
             echo "Building for Windows..."
-            # Example:
-            # make windows
+            # Replace the following line with your actual Windows build commands
+            make windows
+            # Example: Compress-Archive -Path .\build\windows\* -DestinationPath XrayKit-windows.zip
           fi
+        shell: /bin/bash -e {0}
 
-      - name: Render Template (macOS only)
+      # Verify build output on macOS
+      - name: Verify Build Output
         if: runner.os == 'macOS'
         run: |
-          export TEMP=$(shasum -a 256 xray/XrayKit.xcframework.zip | awk '{ print $1 }')
+          ls -la xray
+
+      - name: Render Template
+        if: runner.os == 'macOS'
+        run: |
+          export TEMP=$(shasum -a 256 XrayKit.xcframework.zip | awk '{ print $1 }')
           export CHECKSUM=${TEMP}
           cd Templates
           sed -i "_bak" "s/VERSION/${{ github.event.inputs.version }}/g" Package.template
           sed -i "_bak" "s/CHECKSUM/${CHECKSUM}/g" Package.template
 
-      - name: Update Package.swift (macOS only)
+      - name: Update Package.swift
         if: runner.os == 'macOS'
         run: |
           rm -f Package.swift
           cp ./Templates/Package.template Package.swift
 
-      - name: Commit Changes (macOS only)
+      - name: Commit Changes
         if: runner.os == 'macOS'
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
@@ -81,10 +94,20 @@ jobs:
           tagging_message: "${{ github.event.inputs.version }}"
           file_pattern: 'Package.swift'
 
-      - name: Upload Release (macOS only)
+      - name: Upload Release (macOS Only)
         if: runner.os == 'macOS'
         uses: softprops/action-gh-release@v1
         with:
           draft: false
           tag_name: "${{ github.event.inputs.version }}"
-          files: xray/XrayKit.xcframework.zip
+          files: XrayKit.xcframework.zip
+
+      # Optional: Upload artifacts for other platforms
+      - name: Upload Release Artifacts
+        if: runner.os != 'macOS'
+        uses: actions/upload-artifact@v3
+        with:
+          name: "XrayKit-${{ runner.os }}"
+          path: |
+            XrayKit-${{ runner.os }}.tar.gz
+            XrayKit-${{ runner.os }}.zip
